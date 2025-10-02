@@ -100,11 +100,9 @@ Rellena con tus valores reales. Para tu IP:
 
 ---
 
-## 4) Credenciales AWS (¿qué, por qué, dónde?)
+## 4) Credenciales AWS
 
-**¿Qué?** Un perfil con tus Access Keys para que Terraform pueda crear recursos.
-
-**¿Por qué?** Terraform usa el proveedor AWS y toma credenciales del **AWS CLI** (o variables de entorno).
+Seteamos con Access Keys para que Terraform pueda crear recursos.
 
 **¿Dónde se guarda?** En tu home:  
 `C:\Users\TU_USUARIO\.aws\credentials` y `...\config`.
