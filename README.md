@@ -1,3 +1,4 @@
+![Image](https://github.com/user-attachments/assets/d63eec0c-05d0-4453-82a1-b63472bd5a52)
 # 🧀 CHEESE-APP con Terraform + AWS — README
 
 Infraestructura como código que despliega **3 contenedores** (wensleydale, cheddar, stilton) en **EC2** detrás de un **Application Load Balancer (ALB)** dentro de una **VPC** creada con Terraform.  
@@ -160,7 +161,11 @@ terraform output alb_dns_name
 
 Abre en el navegador y **refresca**; verás los sabores.  
 *Nota:* Los navegadores reutilizan conexiones; si quieres ver rotación más evidente, mira la sección 7.
+<img width="2879" height="878" alt="cheddar" src="https://github.com/user-attachments/assets/30b66799-14c3-46be-979d-77da4f00830e" />
 
+<img width="2876" height="1009" alt="wensleydale" src="https://github.com/user-attachments/assets/398dd802-94af-416b-8a8f-e14536263294" />
+
+<img width="2871" height="1110" alt="Image" src="https://github.com/user-attachments/assets/b3700478-086d-46d3-a2bf-22e2bc432c21" />
 ---
 
 ## 6) Comprobaciones útiles
@@ -229,42 +234,6 @@ resource "aws_lb_target_group" "tg" {
 }
 ```
 
----
-
-## 8) Mapeo con criterios de evaluación
-
-- **Variables** → `variables.tf` (región, tipo de instancia, imágenes, etc.).
-- **.tfvars + ejemplo** → `terraform.tfvars` (local) + `terraform.tfvars.example` (en repo).
-- **Expresión condicional** → `IsPrimary = count.index == 0 ? "true" : "false"`.
-- **Funciones nativas** → `element(var.cheese_images, count.index)` y `cidrsubnet(var.vpc_cidr, 8, i)`.
-
----
-
-## 9) Troubleshooting
-
-- **ALB 503 o targets unhealthy (al principio):**
-  - Espera ~1–2 min post-apply.
-  - Verifica `user_data.tpl` en **LF**.
-  - SG de EC2 debe permitir **80** desde el **SG del ALB** (no 0.0.0.0/0).
-- **“Unable to locate credentials / AccessDenied”**:
-  - Repite `aws configure --profile cheese-lab` y confirma el provider.
-- **No ves los 3 sabores al refrescar**:
-  - Prueba con `curl.exe --no-keepalive` (sección 7).
-  - (Opcional) `enable_http2=false` + `idle_timeout=1`.
-- **Recrear solo la instancia “cheddar”**:
-  ```powershell
-  terraform apply -replace="aws_instance.web[1]" -auto-approve
-  ```
-
----
-
-## 10) Destroy (limpieza y costos)
-
-```powershell
-terraform plan -destroy -var-file="terraform.tfvars"
-terraform destroy -var-file="terraform.tfvars" -auto-approve
-```
-
 *(Opcional) limpieza local:*
 ```powershell
 Remove-Item -Recurse -Force .terraform
@@ -274,7 +243,7 @@ Remove-Item *.tfstate*
 
 ---
 
-## 11) Buenas prácticas
+## 8) Buenas prácticas
 
 - **Nunca** subas claves ni `terraform.tfvars` (usa `.gitignore`).
 - Usa **perfiles** del AWS CLI, no pongas `access_key/secret_key` en `.tf`.
@@ -292,16 +261,3 @@ Remove-Item *.tfstate*
 ```
 
 ---
-
-## 12) Anexos útiles
-
-- Ver atributos del ALB (comprobar http2/idle_timeout):
-  ```powershell
-  $albArn = (aws elbv2 describe-load-balancers --names cheese-alb --query "LoadBalancers[0].LoadBalancerArn" --output text --profile cheese-lab)
-  aws elbv2 describe-load-balancer-attributes --load-balancer-arn $albArn --profile cheese-lab --output table
-  ```
-- Ver atributos del TG (algoritmo, stickiness):
-  ```powershell
-  $tg = (aws elbv2 describe-target-groups --names cheese-tg --query "TargetGroups[0].TargetGroupArn" --output text --profile cheese-lab)
-  aws elbv2 describe-target-group-attributes --target-group-arn $tg --profile cheese-lab --output table
-  ```
