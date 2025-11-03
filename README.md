@@ -1,11 +1,37 @@
 ![Image](https://github.com/user-attachments/assets/d63eec0c-05d0-4453-82a1-b63472bd5a52)
-# 🧀 CHEESE-APP con Terraform + AWS — README
+# 🧀 Cheese Factory App (Refactorizado con Módulos)
 
-Infraestructura como código que despliega **3 contenedores** (wensleydale, cheddar, stilton) en **EC2** detrás de un **Application Load Balancer (ALB)** dentro de una **VPC** creada con Terraform.  
+Infraestructura como código que despliega **3 contenedores** (wensleydale, cheddar, stilton) en **EC2** detrás de un **Application Load Balancer (ALB)** dentro de una **VPC** creada con Terraform, usando una arquitectura profesional, modular y con estado remoto en S3.
+
+Cumple con todos los requisitos de la Actividad 2.1, incluyendo el uso de módulos públicos para la VPC y el backend S3, y lógica condicional.
+
+## 🏗️ Estructura del Proyecto
+
+Este proyecto se divide en dos fases/carpetas:
 Incluye buenas prácticas, pruebas y guía de troubleshooting.
+```
+chesse-app/ (Carpeta raíz del proyecto)
+│
+├─ 1-s3-backend-bootstrap/       # 🚀 FASE 1: Crea el backend S3
+│  ├─ main.tf                   # Define el bucket S3 (módulo) y la tabla DynamoDB
+│  ├─ variables.tf              # Declara la variable 's3_bucket_name'
+│  ├─ outputs.tf                # Devuelve el nombre del bucket y la tabla
+│  ├─ terraform.tfvars          # (Local) Asigna el nombre a 's3_bucket_name' (Ignorado por Git)
+│  └─ terraform.tfvars.example  # Archivo de ejemplo
+│
+├─ 2-chesse-app-refactored/      # 🏗️ FASE 2: Despliega la aplicación
+│  ├─ main.tf                   # Define el backend "s3", módulo VPC, ALB, EC2, SGs
+│  ├─ variables.tf              # Declara 'environment', 'allowed_ssh_cidr', etc.
+│  ├─ outputs.tf                # Devuelve la URL del ALB
+│  ├─ user_data.tpl             # Script de arranque (¡Formato LF!)
+│  ├─ terraform.tfvars          # (Local) Asigna tu IP, key_name, etc. (Ignorado por Git)
+│  └─ terraform.tfvars.example  # Archivo de ejemplo
+│
+├─ .gitattributes                # (Nuevo) Fuerza el formato LF para .tpl
+├─ .gitignore                    # (Actualizado) Ignora **/.terraform/ y **/*.tfvars
+└─ README.md                     # (Actualizado) Explica el nuevo flujo de 2 Fases
 
----
-
+```
 ## 0) Requisitos
 
 - **Windows + VS Code** (terminal integrada).
@@ -24,229 +50,145 @@ Incluye buenas prácticas, pruebas y guía de troubleshooting.
 
 ---
 
-## 1) Estructura del repositorio
+## 📋 Prerrequisitos
 
-```
-chesse-app/
-├─ main.tf
-├─ variables.tf
-├─ outputs.tf
-├─ user_data.tpl               # script de arranque (EOL: LF)
-├─ terraform.tfvars            # valores locales (NO subir)
-├─ terraform.tfvars.example    # ejemplo para el repositorio
-├─ README.md
-└─ .gitignore
-```
+Para desplegar este proyecto, necesitará:
 
-### EOL del `user_data.tpl`
-Guarda el archivo con fin de línea **LF**, no CRLF.  
-En VS Code: barra de estado (abajo derecha) → “CRLF” → cambiar a **LF**.
+1.  **Terraform:** Instalado localmente.
+2.  **AWS CLI:** Instalada localmente.
+3.  **Credenciales de AWS:** Una Access Key ID y Secret Access Key con permisos de administrador.
+4.  **Par de Llaves EC2:** El **nombre** de un Par de Llaves (Key Pair) existente en la región `us-east-1`.
+5.  **Su IP Pública:** Para añadirla a la regla de SSH.
 
 ---
 
-## 2) ¿Qué se crea? (Arquitectura)
+## ⚠️ ¡Advertencia Importante! (CRLF vs. LF)
 
-- **VPC** `10.0.0.0/16`
-- **3 subnets públicas** `/24` (cálculo con `cidrsubnet()`).
-- **Internet Gateway + Route Table** pública.
-- **Security Groups**:
-  - ALB: abre **HTTP:80** a Internet.
-  - EC2: permite **HTTP:80 SOLO desde el SG del ALB** y **SSH:22** desde tu IP `/32`.
-- **ALB** (HTTP 80) + **Target Group** + **Listener**.
-- **3 instancias EC2** (Amazon Linux 2) en subnets/AZ distintas.
-  - Arrancan Docker y ejecutan 1 contenedor cada una.
-  - **Etiquetas**:
-    - `Flavor = wensleydale | cheddar | stilton`
-    - `IsPrimary = true` solo en la primera (condicional con `count.index == 0 ? ...`).
+Este proyecto usa un script `user_data.tpl` que se ejecuta en **Linux (Amazon Linux 2)**.
+* Los scripts de Linux **requieren** finales de línea **LF**.
+* Windows usa finales de línea **CRLF**.
 
-> Funciones nativas usadas: `cidrsubnet()` y `element()`.
+Si el proyecto se clona en Windows, Git puede corromper este archivo. Si el script se aplica con formato CRLF, **el despliegue fallará** (las instancias EC2 quedarán como `unhealthy`).
+
+**Solución:**
+Este repositorio incluye un archivo `.gitattributes` que instruye a Git para forzar el formato `LF`.
+
+Si, por alguna razón, el despliegue falla (las instancias quedan `unhealthy`), por favor verifique en su editor (ej. VS Code) que el archivo `2-chesse-app-refactored/user_data.tpl` muestre **"LF"** en la barra de estado azul de abajo a la derecha antes de volver a aplicar.
+
 
 ---
 
-## 3) Variables y `tfvars`
+## 🚀 Flujo de Despliegue
 
-### `variables.tf` (resumen esperado)
-```hcl
-variable "aws_region"        { type = string }
-variable "vpc_cidr"          { type = string }
-variable "instance_type"     { type = string }
-variable "allowed_ssh_cidr"  { type = string }   # Ej: "201.123.45.67/32"
-variable "aws_key_name"      { type = string, default = null } # opcional
-variable "cheese_images" {
-  type = list(string)
-  default = [
-    "errm/cheese:wensleydale",
-    "errm/cheese:cheddar",
-    "errm/cheese:stilton",
-  ]
-}
-```
+### Fase 1: Desplegar el Backend S3
 
-### `terraform.tfvars.example` (para subir al repo)
-```hcl
-aws_region       = "us-east-1"
-vpc_cidr         = "10.0.0.0/16"
-instance_type    = "t2.micro"
-allowed_ssh_cidr = "X.X.X.X/32"   # reemplazar por tu IP pública/32
-aws_key_name     = ""             # opcional si usarás SSH
-# cheese_images  = [...]
-```
+Esta fase crea el bucket S3 y la tabla DynamoDB para el estado remoto.
 
-### Tu `terraform.tfvars` local (NO commitear)
-Rellena con tus valores reales. Para tu IP:
-```powershell
-(Invoke-RestMethod ifconfig.me/ip) + "/32"
-```
+1.  **Configurar Credenciales de AWS:**
+    * Este proyecto está configurado para usar el perfil `default`.
+    * Ejecute `aws configure` para guardar sus credenciales en el perfil `default`.
+    ```bash
+    aws configure
+    ```
+    (Ingrese su Key ID, Secret Key, `us-east-1` y `json`).
 
----
+2.  **Navegar a la Carpeta 1:**
+    ```bash
+    cd 1-s3-backend-bootstrap
+    ```
 
-## 4) Credenciales AWS
+3.  **Crear Archivo de Variables:**
+    * Copie `terraform.tfvars.example` a un nuevo archivo llamado `terraform.tfvars`.
+    * Edite `terraform.tfvars` y asigne un **nombre globalmente único** al bucket S3.
+    ```hcl
+    # 1-s3-backend-bootstrap/terraform.tfvars
+    
+    s3_bucket_name = "tf-state-profesor-nombre-unico-2025"
+    ```
 
-Seteamos con Access Keys para que Terraform pueda crear recursos.
+4.  **Inicializar y Aplicar:**
+    ```bash
+    terraform init
+    terraform apply -auto-approve
+    ```
 
-**¿Dónde se guarda?** En tu home:  
-`C:\Users\TU_USUARIO\.aws\credentials` y `...\config`.
-
-### Crear perfil `cheese-lab`
-```powershell
-aws configure --profile cheese-lab
-# AWS Access Key ID: AKIA...
-# AWS Secret Access Key: ...
-# Default region name: us-east-1
-# Default output format: json
-```
-
-Verifica:
-```powershell
-aws sts get-caller-identity --profile cheese-lab
-```
-
-### Provider en `main.tf`
-```hcl
-terraform {
-  required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-  }
-}
-
-provider "aws" {
-  region  = var.aws_region
-  profile = "cheese-lab"   # usa tu perfil del CLI
-}
-```
-
-> Alternativa: `setx AWS_PROFILE cheese-lab` y deja el `provider` sin `profile`.
+5.  **¡Anote las Salidas!**
+    * Al finalizar, copie los valores `s3_bucket_name` y `dynamodb_table_name` de la terminal. Los necesitará en la siguiente fase.
 
 ---
 
-## 5) Inicializar y desplegar
+### Fase 2: Desplegar la Aplicación (Cheese App)
 
-En la carpeta del proyecto:
+Esta fase despliega la VPC, ALB e instancias EC2.
 
-```powershell
-terraform init
-terraform fmt
-terraform validate
-terraform plan -var-file="terraform.tfvars" -out=tfplan
-terraform apply tfplan
-```
+1.  **Navegar a la Carpeta 2:**
+    ```bash
+    cd ..\2-chesse-app-refactored
+    ```
+    (O `cd ../2-chesse-app-refactored` en Mac/Linux).
 
-Al finalizar:
-```powershell
-terraform output alb_dns_name
-# Ej: cheese-alb-xxxxxx.us-east-1.elb.amazonaws.com
-```
+2.  **Conectar el Backend Remoto (Paso Manual):**
+    * Abra el archivo `2-chesse-app-refactored/main.tf`.
+    * Busque el bloque `backend "s3" { ... }` al principio.
+    * **Pegue los valores** que anotó en la Fase 1:
+    ```terraform
+    backend "s3" {
+      bucket         = "tf-state-profesor-nombre-unico-2025" # <- SU BUCKET
+      key            = "cheese-app/terraform.tfstate"
+      region         = "us-east-1"
+      dynamodb_table = "terraform-cheese-lock" # <- SU TABLA
+      encrypt        = true
+    }
+    ```
 
-Abre en el navegador y **refresca**; verás los sabores.  
-*Nota:* Los navegadores reutilizan conexiones; si quieres ver rotación más evidente, mira la sección 7.
-<img width="2879" height="878" alt="cheddar" src="https://github.com/user-attachments/assets/30b66799-14c3-46be-979d-77da4f00830e" />
+3.  **Crear Archivo de Variables:**
+    * Copie `terraform.tfvars.example` a un nuevo archivo `terraform.tfvars` en esta carpeta.
+    * Edítelo y rellene su **IP pública** (con `/32`) y el **nombre de su Key Pair** existente:
+    ```hcl
+    # 2-chesse-app-refactored/terraform.tfvars
+    
+    environment      = "dev"
+    allowed_ssh_cidr = "SU.IP.PUBLICA.AQUI/32"
+    aws_key_name     = "su-keypair-existente"
+    ```
 
-<img width="2876" height="1009" alt="wensleydale" src="https://github.com/user-attachments/assets/398dd802-94af-416b-8a8f-e14536263294" />
-
-<img width="2871" height="1110" alt="Image" src="https://github.com/user-attachments/assets/b3700478-086d-46d3-a2bf-22e2bc432c21" />
----
-
-## 6) Comprobaciones útiles
-
-### A) Targets HEALTHY
-Consola AWS → EC2 → **Target Groups** → `cheese-tg` → **Targets** (3 en healthy).
-
-CLI:
-```powershell
-$tg = (aws elbv2 describe-target-groups --names cheese-tg --query "TargetGroups[0].TargetGroupArn" --output text --profile cheese-lab)
-aws elbv2 describe-target-health --target-group-arn $tg --profile cheese-lab --output table
-```
-
-### B) Etiquetas (IsPrimary / Flavor)
-```powershell
-aws ec2 describe-instances `
-  --filters "Name=tag:Name,Values=cheese-*" `
-  --query "Reservations[].Instances[].{Name:Tags[?Key=='Name']|[0].Value,Flavor:Tags[?Key=='Flavor']|[0].Value,IsPrimary:Tags[?Key=='IsPrimary']|[0].Value}" `
-  --output table --profile cheese-lab
-```
-
----
-
-## 7) Ver 3 quesos con reparto “equitativo” en pruebas
-
-El ALB balancea por **conexión**; el navegador usa **keep-alive/HTTP2**. Para evidenciar la rotación:
-
-### Opción rápida (PowerShell con `curl.exe`)
-```powershell
-$alb = "http://$(terraform output -raw alb_dns_name)"
-1..20 | % {
-  curl.exe -s --no-keepalive -H "Cache-Control: no-cache" $alb |
-    Select-String -Pattern "wensleydale|cheddar|stilton"
-}
-```
-Para contar:
-```powershell
-$counts = @{wensleydale=0; cheddar=0; stilton=0}
-1..90 | % {
-  $html = curl.exe -s --no-keepalive -H "Cache-Control: no-cache" $alb
-  if ($html -match "wensleydale") {$counts.wensleydale++}
-  elseif ($html -match "cheddar") {$counts.cheddar++}
-  elseif ($html -match "stilton") {$counts.stilton++}
-}
-$counts
-```
-
-### Ajustes opcionales para la demo (en `aws_lb`)
-```hcl
-resource "aws_lb" "alb" {
-  # ...
-  enable_http2 = false   # evita multiplexación del browser
-  idle_timeout = 1       # cierra conexiones ociosas rápido (solo demo)
-}
-```
-
-### Algoritmo del Target Group
-```hcl
-resource "aws_lb_target_group" "tg" {
-  # ...
-  load_balancing_algorithm_type = "round_robin" # default
-  # Alternativa si una instancia responde más lento:
-  # load_balancing_algorithm_type = "least_outstanding_requests"
-
-  stickiness { type = "lb_cookie", enabled = false }
-}
-```
-
-*(Opcional) limpieza local:*
-```powershell
-Remove-Item -Recurse -Force .terraform
-Remove-Item .terraform.lock.hcl
-Remove-Item *.tfstate*
-```
+4.  **Inicializar y Aplicar:**
+    ```bash
+    terraform init
+    ```
+    *(Verá un mensaje que dice "Successfully configured the backend 's3'".)*
+    
+    ```bash
+    terraform apply -auto-approve
+    ```
+    *(Esto tardará de 3 a 5 minutos, principalmente por el NAT Gateway).*
 
 ---
 
-## 8) Buenas prácticas
+## 🧪 Comprobación
 
-- **Nunca** subas claves ni `terraform.tfvars` (usa `.gitignore`).
-- Usa **perfiles** del AWS CLI, no pongas `access_key/secret_key` en `.tf`.
-- Etiquetas claras (`Name`, `Flavor`, `IsPrimary`) para trazabilidad.
-- Para producción, revierte `idle_timeout` a `60` y deja `enable_http2 = true`.
+1.  Una vez que `apply` termine, copie la salida `alb_dns_name` de la terminal.
+2.  **Espere 1-2 minutos** para que las instancias EC2 ejecuten el script `user_data` (instalación de Docker) y pasen los chequeos de salud.
+3.  Pegue la URL en su navegador.
+4.  Refresque la página (`F5`) varias veces. Verá cómo la página rota entre los quesos `wensleydale`, `cheddar` y `stilton`.
+
+---
+
+## 🧹 Limpieza (Destroy)
+
+Para borrar todos los recursos y no generar costos, ejecute `destroy` en **orden inverso**:
+
+1.  **Destruir la Aplicación (Fase 2):**
+    ```bash
+    cd 2-chesse-app-refactored
+    terraform destroy -auto-approve
+    ```
+2.  **Destruir el Backend (Fase 1):**
+    ```bash
+    cd ..\1-s3-backend-bootstrap
+    terraform destroy -auto-approve
+    ```
+
 
 ### `.gitignore` sugerido
 ```
