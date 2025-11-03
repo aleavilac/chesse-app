@@ -1,6 +1,14 @@
-aws_region       = "us-east-1"
-vpc_cidr         = "10.0.0.0/16"
-instance_type    = "t2.micro"
-allowed_ssh_cidr = "X.X.X.X/32"     # Reemplaza por tu IP pública /32
-aws_key_name     = "mi-keypair"     # Debe existir en EC2 > Key Pairs (opcional)
-# cheese_images = ["errm/cheese:wensleydale","errm/cheese:cheddar","errm/cheese:stilton"]
+# REQ 1: Archivo de ejemplo .tfvars
+
+# Entorno (dev o prod). Esto controlará el tipo de instancia.
+environment = "dev"
+
+# Tu IP pública para SSH (OBLIGATORIO)
+allowed_ssh_cidr = "X.X.X.X/32"
+
+# Nombre de tu Key Pair de AWS (Opcional, pero recomendado)
+aws_key_name = "mi-keypair"
+
+# Opcional: puedes sobreescribir la región o el CIDR
+# aws_region = "us-east-1"
+# vpc_cidr   = "10.0.0.0/16"

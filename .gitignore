@@ -1,7 +1,21 @@
-terraform.tfvars
-.terraform/
-*.tfstate*
-crash.log
-# Terraform plan files
-tfplan
-*.tfplan
+# Archivos de variables locales (nunca subir)
+**_terraform.tfvars
+**_*.auto.tfvars
+
+# Archivos de estado locales (si no se usa backend remoto)
+**_*.tfstate
+**_*.tfstate.backup
+
+# Archivos internos de Terraform
+**_/.terraform/
+**_/.terraform.lock.hcl
+
+# Logs de crash
+**_/crash.log
+
+# Planes de Terraform
+**_*.tfplan
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/

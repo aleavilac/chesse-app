@@ -10,7 +10,7 @@ terraform {
   # Después de ejecutar el proyecto 's3-backend-bootstrap',
   # rellena estos valores y ejecuta 'terraform init'
   backend "s3" {
-    bucket         = "tf-state-cheese-app-tu-nombre-unico-2025" # <- REEMPLAZA
+    bucket         = "tf-state-cheese-app-alexandra-avila-unico-2025" # <- REEMPLAZA
     key            = "cheese-app/terraform.tfstate" # Ruta dentro del bucket
     region         = "us-east-1"
     dynamodb_table = "terraform-state-lock" # Nombre de la tabla de bloqueo
