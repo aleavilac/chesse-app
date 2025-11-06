@@ -94,14 +94,14 @@ Esta fase crea el bucket S3 y la tabla DynamoDB para el estado remoto.
 
 2.  **Navegar a la Carpeta 1:**
     ```bash
-    cd 1-s3-backend-bootstrap
+    cd 1.s3-backend-bootstrap
     ```
 
 3.  **Crear Archivo de Variables:**
     * Copie `terraform.tfvars.example` a un nuevo archivo llamado `terraform.tfvars`.
     * Edite `terraform.tfvars` y asigne un **nombre globalmente único** al bucket S3.
     ```hcl
-    # 1-s3-backend-bootstrap/terraform.tfvars
+    # 1.s3-backend-bootstrap/terraform.tfvars
     
     s3_bucket_name = "tf-state-profesor-nombre-unico-2025"
     ```
@@ -123,12 +123,12 @@ Esta fase despliega la VPC, ALB e instancias EC2.
 
 1.  **Navegar a la Carpeta 2:**
     ```bash
-    cd ..\2-chesse-app-refactored
+    cd ..\2.chesse-app-refactored
     ```
-    (O `cd ../2-chesse-app-refactored` en Mac/Linux).
+    (O `cd ../2.chesse-app-refactored` en Mac/Linux).
 
 2.  **Conectar el Backend Remoto (Paso Manual):**
-    * Abra el archivo `2-chesse-app-refactored/main.tf`.
+    * Abra el archivo `2.chesse-app-refactored/main.tf`.
     * Busque el bloque `backend "s3" { ... }` al principio.
     * **Pegue los valores** que anotó en la Fase 1:
     ```terraform
@@ -145,7 +145,7 @@ Esta fase despliega la VPC, ALB e instancias EC2.
     * Copie `terraform.tfvars.example` a un nuevo archivo `terraform.tfvars` en esta carpeta.
     * Edítelo y rellene su **IP pública** (con `/32`) y el **nombre de su Key Pair** existente:
     ```hcl
-    # 2-chesse-app-refactored/terraform.tfvars
+    # 2.chesse-app-refactored/terraform.tfvars
     
     environment      = "dev"
     allowed_ssh_cidr = "SU.IP.PUBLICA.AQUI/32"
@@ -180,12 +180,12 @@ Para borrar todos los recursos y no generar costos, ejecute `destroy` en **orden
 
 1.  **Destruir la Aplicación (Fase 2):**
     ```bash
-    cd 2-chesse-app-refactored
+    cd 2.chesse-app-refactored
     terraform destroy -auto-approve
     ```
 2.  **Destruir el Backend (Fase 1):**
     ```bash
-    cd ..\1-s3-backend-bootstrap
+    cd ..\1.s3-backend-bootstrap
     terraform destroy -auto-approve
     ```
 
