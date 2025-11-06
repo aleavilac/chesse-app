@@ -160,7 +160,9 @@ resource "aws_instance" "web" {
   user_data = templatefile("${path.module}/user_data.tpl", {
     CHEESE_IMAGE = element(var.cheese_images, count.index)
   })
-
+  depends_on = [
+    module.vpc.natgw_ids
+  ]
   # REQ 5: Función format() y merge()
   tags = merge(local.common_tags, {
     Name   = format("cheese-%s-ec2-%s", var.environment, element(split(":", var.cheese_images[count.index]), 1))
